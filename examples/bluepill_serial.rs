@@ -80,8 +80,8 @@ fn main() -> ! {
     let id = ZenohID::from(0x49);
     let mode = WhatAmI::default();
     let cfg = zenoh_client_rs::Config::new(id, mode);
-
-    zenoh_client_rs::open(&cfg, intf).unwrap();
+    
+    zenoh_client_rs::transport::new_client(intf).unwrap();
 
     loop {}
 }

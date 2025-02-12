@@ -22,22 +22,33 @@ impl Config {
     }
 }
 
-pub fn open<L: LinkIntf<I=L, Endpoint = L>>(cfg: &Config, ep: L) -> Result<(), link::LinkError> {
-    let mut l = L::new(ep);
-
-    l.open()?;
-    
-    match l.cap.transport() {
-        TransportCap::Unicast => {
-
+pub fn open(cfg: &Config) {
+    match cfg.mode {
+        WhatAmI::Client => {
+            
         },
-        TransportCap::Multicast => {
+        _ => {
             unimplemented!()
-        },
-        TransportCap::Raweth => {
-            unimplemented!()
-        },
+        }
     }
-
-    Ok(())
 }
+
+// pub fn open<L: LinkIntf<I=L, Endpoint = L>>(cfg: &Config, ep: L) -> Result<(), link::LinkError> {
+//     let mut l = L::new(ep);
+
+//     l.open()?;
+    
+//     match l.cap.transport() {
+//         TransportCap::Unicast => {
+
+//         },
+//         TransportCap::Multicast => {
+//             unimplemented!()
+//         },
+//         TransportCap::Raweth => {
+//             unimplemented!()
+//         },
+//     }
+
+//     Ok(())
+// }

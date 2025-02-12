@@ -18,13 +18,18 @@ pub enum LinkError {
     IoError,
 }
 
-pub trait LinkIntf {
-    type I;
-    type Endpoint;
+pub trait LinkIntf: Sized {
+    // type Endpoint;
 
     fn open(&mut self) -> Result<(), LinkError>;
 
-    fn new(ep: Self::Endpoint) -> Link<Self::I>;
+    // fn new(ep: Self::Endpoint) -> Link<Self>;
+}
+
+pub trait Endpoint: Sized {
+    type L: LinkIntf;
+
+    fn create_link_from_endpoint(ep: Self) -> Link<Self::L>;
 }
 
 pub struct Link<Intf> {
@@ -33,26 +38,32 @@ pub struct Link<Intf> {
     pub cap: LinkCapabilities,
 }
 
+impl<RX, TX, Delay> Endpoint for serial::SerialIntf<RX, TX, Delay>
+where 
+    RX: embedded_io::Read,
+    TX: embedded_io::Write,
+    Delay: DelayNs,
+{
+    type L = serial::SerialIntf<RX, TX, Delay>;
+
+    fn create_link_from_endpoint(ep: Self) -> Link<Self::L> {
+        Link {
+            intf: ep,
+            mtu: 1500,
+            cap: LinkCapabilities::new(TransportCap::Unicast, TransportFlow::DATAGRAM, false),
+        }
+    }
+}
+
 impl<RX, TX, Delay> LinkIntf for serial::SerialIntf<RX, TX, Delay>
 where
     RX: embedded_io::Read,
     TX: embedded_io::Write,
     Delay: DelayNs,
 {
-    type I = serial::SerialIntf<RX, TX, Delay>;
-    type Endpoint = serial::SerialIntf<RX, TX, Delay>;
-
     fn open(&mut self) -> Result<(), LinkError> {
         self.connect()?;
         Ok(())
-    }
-
-    fn new(ep: Self::Endpoint) -> Link<Self::I> {
-        Link {
-            intf: ep,
-            mtu: 1500,
-            cap: LinkCapabilities::new(TransportCap::Unicast, TransportFlow::DATAGRAM, false),
-        }
     }
 }
 
@@ -144,11 +155,10 @@ impl LinkCapabilities {
     }
 }
 
-// impl<Intf> Link<Intf>
-// where
-//     Intf: LinkIntf
-// {
-//     pub fn new(intf: Intf) -> Self {
+pub fn open<L: LinkIntf, E: Endpoint<L = L>>(ep: E) -> Result<Link<L>, LinkError> {
+    let mut l = E::create_link_from_endpoint(ep);
 
-//     }
-// }
+    l.open()?;
+
+    Ok(l)
+}
