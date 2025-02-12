@@ -45,9 +45,13 @@ pub(crate) fn serialize_into(
     dest: &mut [u8],
 ) -> Result<usize, super::LinkError> {
     let mut enc = CobsEncoder::new(dest);
+    #[cfg(feature = "defmt")]
+    defmt::debug!("SerialIntf::serialize_into: header={:02X}, data={:02X}", header, data);
+
     enc.push(&[header])?;
 
     let len_bytes = (data.len() as u16).to_le_bytes();
+
     enc.push(&len_bytes)?;
 
     enc.push(data)?;
@@ -57,7 +61,7 @@ pub(crate) fn serialize_into(
 
     let mut written = enc.finalize();
 
-    for x in &mut dest[0..written] {
+    for x in &mut dest[..written] {
         *x ^= 0x00;
     }
 
@@ -87,13 +91,15 @@ pub(crate) fn deserialize_from(
         ));
     }
 
-    let compute_crc = compute_crc32(&dest[3..wire_size + 3]);
+    let compute_crc = compute_crc32(&dest[KIND_FIELD_LEN + LEN_FIELD_LEN..KIND_FIELD_LEN + wire_size + LEN_FIELD_LEN]);
+
+    let received_crc = &dest[KIND_FIELD_LEN + LEN_FIELD_LEN + wire_size..KIND_FIELD_LEN + LEN_FIELD_LEN + wire_size + CRC32_LEN];
 
     let received_crc = u32::from_le_bytes([
-        dest[wire_size],
-        dest[wire_size + 1],
-        dest[wire_size + 2],
-        dest[wire_size + 3],
+        received_crc[0],
+        received_crc[1],
+        received_crc[2],
+        received_crc[3],
     ]);
 
     if compute_crc != received_crc {
@@ -129,11 +135,16 @@ where
 
     fn internal_send(&mut self, header: u8, data: &[u8]) -> Result<(), super::LinkError> {
         let len = serialize_into(header, data, &mut self.send_buf)?;
-
+        #[cfg(feature = "defmt")]
+        defmt::debug!("Sending {:02X}", self.send_buf[..len]);
+        
         self.tx
             .write_all(&self.send_buf[..len])
             .map_err(|_e| super::LinkError::IoError)?;
-
+        self.tx
+            .flush()
+            .map_err(|_| super::LinkError::IoError)?;
+        
         Ok(())
     }
 

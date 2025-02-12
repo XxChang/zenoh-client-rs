@@ -7,10 +7,10 @@ use cortex_m_rt::entry;
 use defmt_rtt as _;
 use embedded_hal_compat::ForwardCompat;
 use panic_probe as _;
-use stm32f1xx_hal::{pac::{self, USART1}, prelude::*, serial::{Config, Rx, Serial}};
+use stm32f1xx_hal::{pac::{self, USART3}, prelude::*, serial::{Config, Rx, Serial}};
 use zenoh_client_rs::{link::serial::SerialIntf, protocol::{whatami::WhatAmI, ZenohID}};
 
-struct WrapperRx(pub Rx<USART1>);
+struct WrapperRx(pub Rx<USART3>);
 
 impl embedded_io::ErrorType for WrapperRx {
     type Error = core::convert::Infallible;
@@ -27,7 +27,7 @@ impl embedded_io::Read for WrapperRx {
                     idx += 1;
                 },
                 Err(nb::Error::WouldBlock) => {
-                    break;
+                    continue;
                 },
                 _ => {
                     unreachable!()
@@ -51,18 +51,19 @@ fn main() -> ! {
 
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
-    let mut gpioa = p.GPIOA.split();
+    let mut gpiob = p.GPIOB.split();
 
-    let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
-    let rx = gpioa.pa10;
+    let tx = gpiob.pb10.into_alternate_push_pull(&mut gpiob.crh);
+    // let tx = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
+    let rx = gpiob.pb11;
 
     let mut afio = p.AFIO.constrain();
 
     let serial = Serial::new(
-        p.USART1, 
+        p.USART3, 
         (tx, rx), 
         &mut afio.mapr, 
-        Config::default().baudrate(115200.bps()), 
+        Config::default().baudrate(2400.bps()), 
         &clocks);
 
     let (tx, rx) = serial.split();
@@ -70,7 +71,7 @@ fn main() -> ! {
     let rx = WrapperRx(rx);
     
     let tx = tx.forward();
-
+    
     let delay = cp.SYST.delay(&clocks);
     let delay = delay.forward();
 

@@ -43,6 +43,7 @@ where
     type Endpoint = serial::SerialIntf<RX, TX, Delay>;
 
     fn open(&mut self) -> Result<(), LinkError> {
+        self.connect()?;
         Ok(())
     }
 
