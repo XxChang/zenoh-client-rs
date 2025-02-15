@@ -9,6 +9,8 @@ embedded-io = "0.6.1"
 defmt = { version = "0.3", optional = true }
 thiserror = { version = "2", default-features = false }
 embedded-hal = "1.0.0"
+heapless = "0.8.0"
+num-traits = { version = "0.2.19", default-features = false }
 
 [dev-dependencies]
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
@@ -23,9 +25,16 @@ nb = "1.1.0"
 features = ["rt", "stm32f103"]
 version = "0.10.0"
 
+[target.thumbv7em-none-eabihf.dev-dependencies.stm32f4xx-hal]
+version = "0.22.1"
+features = ["stm32f407"]
+
 [lib]
 harness = false
 
+[profile.dev]
+debug = 2
+
 [features]
 default = ["defmt"]
-defmt = ["cobs/defmt", "embedded-io/defmt-03", "embedded-hal/defmt-03", "dep:defmt"]
+defmt = ["cobs/defmt", "embedded-io/defmt-03", "embedded-hal/defmt-03", "heapless/defmt-03", "dep:defmt"]

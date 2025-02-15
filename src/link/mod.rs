@@ -2,6 +2,8 @@ use cobs::{DecodeError, DestBufTooSmallError};
 use embedded_hal::delay::DelayNs;
 use thiserror::Error;
 
+use crate::{iobuf::ZVec, protocol::transport::TransportMessage, transport::TransportError};
+
 pub mod serial;
 
 #[derive(Debug, Error)]
@@ -19,11 +21,11 @@ pub enum LinkError {
 }
 
 pub trait LinkIntf: Sized {
-    // type Endpoint;
-
     fn open(&mut self) -> Result<(), LinkError>;
 
-    // fn new(ep: Self::Endpoint) -> Link<Self>;
+    fn send(&mut self, msg: &[u8]) -> Result<(), LinkError>;
+
+    fn recv(&mut self, buf: &mut [u8]) -> Result<usize, LinkError>;
 }
 
 pub trait Endpoint: Sized {
@@ -36,10 +38,12 @@ pub struct Link<Intf> {
     intf: Intf,
     mtu: usize,
     pub cap: LinkCapabilities,
+
+    cache: ZVec,
 }
 
 impl<RX, TX, Delay> Endpoint for serial::SerialIntf<RX, TX, Delay>
-where 
+where
     RX: embedded_io::Read,
     TX: embedded_io::Write,
     Delay: DelayNs,
@@ -51,6 +55,7 @@ where
             intf: ep,
             mtu: 1500,
             cap: LinkCapabilities::new(TransportCap::Unicast, TransportFlow::DATAGRAM, false),
+            cache: ZVec::new(),
         }
     }
 }
@@ -65,14 +70,55 @@ where
         self.connect()?;
         Ok(())
     }
+
+    fn send(&mut self, msg: &[u8]) -> Result<(), LinkError> {
+        self.send(msg)
+    }
+
+    fn recv(&mut self, buf: &mut [u8]) -> Result<usize, LinkError> {
+        self.recv(buf)
+    }
 }
 
-impl<I> Link<I> 
-where 
-    I: LinkIntf
+impl<I> Link<I>
+where
+    I: LinkIntf,
 {
     pub fn open(&mut self) -> Result<(), LinkError> {
         self.intf.open()
+    }
+
+    pub fn send_msg(&mut self, msg: &TransportMessage) -> Result<(), TransportError> {
+        match self.cap.flow() {
+            TransportFlow::DATAGRAM => {}
+            TransportFlow::STREAM => {
+                unimplemented!()
+            }
+        }
+
+        msg.encode(&mut self.cache)?;
+
+        self.intf.send(self.cache.as_slice())?;
+
+        self.cache.clear();
+
+        Ok(())
+    }
+
+    pub fn recv_msg(&mut self) -> Result<TransportMessage, TransportError> {
+        let msg = match self.cap.flow() {
+            TransportFlow::STREAM => {
+                unimplemented!()
+            }
+            TransportFlow::DATAGRAM => {
+                let mut s = self.cache.extract_slice(self.mtu)?;
+                let size = self.intf.recv(s.as_mut())?;
+                s.truncate(size);
+                TransportMessage::decode(&mut s)?
+            }
+        };
+
+        Ok(msg)
     }
 }
 
