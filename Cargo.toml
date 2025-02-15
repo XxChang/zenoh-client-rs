@@ -33,7 +33,10 @@ features = ["stm32f407"]
 harness = false
 
 [profile.dev]
+opt-level = 1
 debug = 2
+lto = true
+codegen-units = 1
 
 [features]
 default = ["defmt"]
