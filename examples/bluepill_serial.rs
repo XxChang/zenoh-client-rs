@@ -16,6 +16,20 @@ use zenoh_client_rs::{
     link::serial::SerialIntf,
     protocol::{whatami::WhatAmI, ZenohID},
 };
+// use rand::{rngs::SmallRng, SeedableRng};
+
+// struct WrapperRng(SmallRng);
+
+// impl WrapperRng {
+//     pub fn new(seed: u64) -> Self {
+//         WrapperRng(SmallRng::seed_from_u64(seed))
+//     }
+// }
+// impl zenoh_client_rs::transport::RandomGenerator for &WrapperRng {
+//     fn get_random<u32>(self) -> u32 {
+
+//     }
+// }
 
 struct WrapperRx(pub Rx<USART3>);
 
@@ -91,6 +105,7 @@ fn main() -> ! {
     let cfg = zenoh_client_rs::Config::new(id, mode);
 
     defmt::debug!("Opening client ep {}", intf.name());
+
     zenoh_client_rs::transport::new_client(intf, &cfg).unwrap();
 
     loop {}

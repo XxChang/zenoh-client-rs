@@ -78,49 +78,6 @@ use crate::{
 use super::{
     TransportBody, TransportMessage, Z_DEFAULT_MULTICAST_BATCH_SIZE, Z_DEFAULT_RESOLUTION_SIZE,
 };
-use heapless::{
-    box_pool,
-    pool::boxed::{Box, BoxBlock},
-};
-
-// Global only cookie
-#[derive(PartialEq, Eq)]
-pub struct Cookie {
-    cookie: [u8; 1024],
-    len: usize,
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Cookie {
-    fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "{=[u8]:?}", &self.cookie[..self.len]);
-    }
-}
-
-impl Cookie {
-    pub fn as_slice(&self) -> &[u8] {
-        &self.cookie[..self.len]
-    }
-
-    fn from_slice(slice: &[u8]) -> Self {
-        let mut cookie = [0u8; 1024];
-        cookie[..slice.len()].copy_from_slice(slice);
-        Cookie {
-            cookie,
-            len: slice.len(),
-        }
-    }
-}
-
-impl core::fmt::Debug for Cookie {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_list()
-            .entries(self.cookie[..self.len].iter())
-            .finish()
-    }
-}
-
-box_pool!(P: Cookie);
 
 pub(crate) const Z_MID_T_INIT: u8 = 0x01;
 
@@ -131,25 +88,18 @@ pub mod flag {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct InitSyn {
-    zid: ZenohID,
-    cookie: Option<Box<P>>,
-    batch_size: u16,
+pub struct InitSyn<'c> {
+    pub zid: ZenohID,
+    pub cookie: Option<&'c [u8]>,
+    pub batch_size: u16,
     whatami: WhatAmI,
-    req_id_res: u8,
-    seq_num_res: u8,
+    pub req_id_res: u8,
+    pub seq_num_res: u8,
     version: u8,
 }
 
-impl InitSyn {
-    pub fn new(whatami: WhatAmI, zid: ZenohID) -> TransportMessage {
-        let block: &'static mut BoxBlock<Cookie> = unsafe {
-            static mut B: BoxBlock<Cookie> = BoxBlock::new();
-            &mut B
-        };
-
-        P.manage(block);
-
+impl<'c> InitSyn<'c> {
+    pub fn new(whatami: WhatAmI, zid: ZenohID) -> TransportMessage<'c> {
         TransportMessage {
             body: TransportBody::InitSyn(InitSyn {
                 version: Z_PROTO_VERSION,
@@ -206,8 +156,8 @@ impl InitSyn {
         }
 
         if header & flag::A == flag::A {
-            if let Some(cookie) = &self.cookie {
-                writer.write_exact(cookie.as_slice())?;
+            if let Some(cookie) = self.cookie {
+                writer.write_exact(cookie)?;
             }
         }
 
@@ -256,12 +206,8 @@ impl InitSyn {
 
             let cookie = reader.read_slice_in_place(cookie_len)?;
 
-            let cookie = P
-                .alloc(Cookie::from_slice(cookie))
-                .map_err(|_| TransportError::MoreCookieAllocated)?;
-
-            // #[cfg(feature = "defmt")]
-            // defmt::debug!("cookie: {:X}", *cookie);
+            #[cfg(feature = "defmt")]
+            defmt::debug!("cookie: {:X}", *cookie);
 
             Some(cookie)
         } else {

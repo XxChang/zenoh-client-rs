@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use link::{LinkIntf, TransportCap};
 use protocol::{whatami::WhatAmI, ZenohID};
 
 mod iobuf;
@@ -14,6 +13,7 @@ const Z_MAX_MTU: usize = 2048;
 const Z_PROTO_VERSION: u8 = 0x09;
 const Z_SN_RESOLUTION: u8 = 0x02;
 const Z_REQ_RESOLUTION: u8 = 0x02;
+const Z_TRANSPORT_LEASE: u32 = 10000;
 
 pub struct Config {
     pub id: ZenohID,
@@ -34,23 +34,3 @@ pub fn open(cfg: &Config) {
         }
     }
 }
-
-// pub fn open<L: LinkIntf<I=L, Endpoint = L>>(cfg: &Config, ep: L) -> Result<(), link::LinkError> {
-//     let mut l = L::new(ep);
-
-//     l.open()?;
-
-//     match l.cap.transport() {
-//         TransportCap::Unicast => {
-
-//         },
-//         TransportCap::Multicast => {
-//             unimplemented!()
-//         },
-//         TransportCap::Raweth => {
-//             unimplemented!()
-//         },
-//     }
-
-//     Ok(())
-// }

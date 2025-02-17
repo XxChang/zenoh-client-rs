@@ -1,5 +1,5 @@
 use crate::{
-    link::{Endpoint, Link, LinkIntf, TransportCap},
+    link::{Endpoint, LinkIntf, TransportCap},
     Config,
 };
 use thiserror::Error;
@@ -21,6 +21,10 @@ pub enum TransportError {
     DecodeError(#[from] crate::iobuf::DidntRead),
     #[error("More cookie been allocated")]
     MoreCookieAllocated,
+    #[error("Unexpect Message")]
+    UnexpectMsg,
+    #[error("Unexpect open sn resolution")]
+    OpenSnResolution,
 }
 
 pub fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
@@ -45,4 +49,8 @@ pub fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
     }
 
     Ok(())
+}
+
+pub trait RandomGenerator {
+    fn get_random<T>(self) -> T;
 }

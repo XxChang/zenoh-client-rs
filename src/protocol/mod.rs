@@ -1,9 +1,12 @@
-use crate::{iobuf::Reader, transport::TransportError};
+use crate::{
+    iobuf::{Reader, Writer},
+    transport::TransportError,
+};
 
 pub mod transport;
 pub mod whatami;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ZenohID([u8; ZenohID::MAX_SIZE]);
 
@@ -32,26 +35,25 @@ pub(crate) struct Varint<T> {
 }
 
 impl<T> Varint<T> {
-    // pub fn encode(&mut self, value: T) -> usize
-    // where
-    //     T: num_traits::PrimInt,
-    // {
-    //     let mut value = value;
-    //     let mut i = 0;
-    //     loop {
-    //         let mut byte = (value & T::from(0x7F).unwrap()).to_u8().unwrap();
-    //         value = value >> 7;
-    //         if value != T::zero() {
-    //             byte |= 0x80;
-    //         }
-    //         self.bytes[i] = byte;
-    //         i += 1;
-    //         if value == T::zero() {
-    //             break;
-    //         }
-    //     }
-    //     i
-    // }
+    pub fn encode<W: Writer>(writer: &mut W, value: T) -> Result<(), TransportError>
+    where
+        T: num_traits::PrimInt,
+    {
+        let mut value = value;
+        loop {
+            let mut byte = (value & T::from(0x7F).unwrap()).to_u8().unwrap();
+            value = value >> 7;
+            if value != T::zero() {
+                byte |= 0x80;
+            }
+            writer.write_u8(byte)?;
+            if value == T::zero() {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 
     pub fn decode<R: Reader>(reader: &mut R) -> Result<T, TransportError>
     where

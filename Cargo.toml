@@ -11,6 +11,8 @@ thiserror = { version = "2", default-features = false }
 embedded-hal = "1.0.0"
 heapless = "0.8.0"
 num-traits = { version = "0.2.19", default-features = false }
+once_cell = { version = "1.20.3", default-features = false }
+rand = { version = "0.9.0", default-features = false, features = ["small_rng"]}
 
 [dev-dependencies]
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}

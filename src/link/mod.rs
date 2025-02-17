@@ -2,7 +2,7 @@ use cobs::{DecodeError, DestBufTooSmallError};
 use embedded_hal::delay::DelayNs;
 use thiserror::Error;
 
-use crate::{iobuf::ZVec, protocol::transport::TransportMessage, transport::TransportError};
+use crate::transport::TransportError;
 
 pub mod serial;
 
@@ -36,10 +36,8 @@ pub trait Endpoint: Sized {
 
 pub struct Link<Intf> {
     intf: Intf,
-    mtu: usize,
+    pub mtu: usize,
     pub cap: LinkCapabilities,
-
-    cache: ZVec,
 }
 
 impl<RX, TX, Delay> Endpoint for serial::SerialIntf<RX, TX, Delay>
@@ -55,7 +53,6 @@ where
             intf: ep,
             mtu: 1500,
             cap: LinkCapabilities::new(TransportCap::Unicast, TransportFlow::DATAGRAM, false),
-            cache: ZVec::new(),
         }
     }
 }
@@ -88,7 +85,7 @@ where
         self.intf.open()
     }
 
-    pub fn send_msg(&mut self, msg: &TransportMessage) -> Result<(), TransportError> {
+    pub fn send_msg(&mut self, msg: &[u8]) -> Result<(), TransportError> {
         match self.cap.flow() {
             TransportFlow::DATAGRAM => {}
             TransportFlow::STREAM => {
@@ -96,25 +93,19 @@ where
             }
         }
 
-        msg.encode(&mut self.cache)?;
-
-        self.intf.send(self.cache.as_slice())?;
-
-        self.cache.clear();
+        self.intf.send(msg)?;
 
         Ok(())
     }
 
-    pub fn recv_msg(&mut self) -> Result<TransportMessage, TransportError> {
+    pub fn recv_msg(&mut self, data: &mut [u8]) -> Result<usize, TransportError> {
         let msg = match self.cap.flow() {
             TransportFlow::STREAM => {
                 unimplemented!()
             }
             TransportFlow::DATAGRAM => {
-                let mut s = self.cache.extract_slice(self.mtu)?;
-                let size = self.intf.recv(s.as_mut())?;
-                s.truncate(size);
-                TransportMessage::decode(&mut s)?
+                let size = self.intf.recv(data)?;
+                size
             }
         };
 
