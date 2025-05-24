@@ -1,5 +1,6 @@
 use crate::{
     link::{Endpoint, LinkIntf, TransportCap},
+    protocol::whatami::WhatAmI,
     Config,
 };
 use thiserror::Error;
@@ -27,10 +28,10 @@ pub enum TransportError {
     OpenSnResolution,
 }
 
-pub fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
+fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
     ep: E,
     cfg: &Config,
-) -> Result<(), TransportError> {
+) -> Result<Transport<L>, TransportError> {
     #[cfg(feature = "defmt")]
     defmt::debug!("Opening link");
 
@@ -38,7 +39,9 @@ pub fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
     match zl.cap.transport() {
         TransportCap::Unicast => {
             let mut unicast = unicast::Unicast::new(zl);
-            unicast.handshake(cfg.mode, cfg.id)?;
+            let params = unicast.handshake(cfg.mode, cfg.id)?;
+            unicast.update(&params)?;
+            Ok(Transport::Unicast(unicast))
         }
         TransportCap::Multicast => {
             unimplemented!()
@@ -47,10 +50,15 @@ pub fn new_client<L: LinkIntf, E: Endpoint<L = L>>(
             unimplemented!()
         }
     }
-
-    Ok(())
 }
 
-pub trait RandomGenerator {
-    fn get_random<T>(self) -> T;
+impl<L: LinkIntf> Transport<L> {
+    pub fn new<E: Endpoint<L = L>>(ep: E, cfg: &Config) -> Result<Transport<L>, TransportError> {
+        match cfg.mode {
+            WhatAmI::Client => new_client(ep, cfg),
+            _ => {
+                unimplemented!()
+            }
+        }
+    }
 }

@@ -29,7 +29,11 @@
 //! (**)    The cookie MUST be the same received in the [`super::InitAck`]from the corresponding zenoh node
 //!
 
-use crate::{iobuf::{Reader, Writer}, protocol::{transport::TransportBody, Varint}, transport::TransportError};
+use crate::{
+    iobuf::{Reader, Writer},
+    protocol::{transport::TransportBody, Varint},
+    transport::TransportError,
+};
 
 use super::TransportMessage;
 
@@ -93,7 +97,10 @@ impl<'a> OpenSyn<'a> {
         Ok(())
     }
 
-    pub fn decode<R: Reader>(reader: &mut R, header: u8) -> Result<TransportMessage, TransportError> {
+    pub fn decode<R: Reader>(
+        reader: &mut R,
+        header: u8,
+    ) -> Result<TransportMessage, TransportError> {
         #[cfg(feature = "defmt")]
         defmt::debug!("Decoding _Z_MID_T_OPEN");
 
@@ -122,16 +129,16 @@ impl<'a> OpenSyn<'a> {
                 body: TransportBody::OpenAck(OpenSyn {
                     lease,
                     initial_sn,
-                    cookie
-                })
+                    cookie,
+                }),
             })
         } else {
             Ok(TransportMessage {
                 body: TransportBody::OpenSyn(OpenSyn {
                     lease,
                     initial_sn,
-                    cookie
-                })
+                    cookie,
+                }),
             })
         }
     }

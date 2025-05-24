@@ -12,6 +12,12 @@ use crate::Z_TRANSPORT_LEASE;
 use super::TransportError;
 
 pub struct Unicast<L> {
+    intf: Link<L>,
+    cache: ZVec,
+    open_cache: ZVec,
+}
+
+pub struct UnicastParams {
     pub zid: ZenohID,
     pub batch_size: u16,
     pub initial_sn_rx: u32,
@@ -22,15 +28,11 @@ pub struct Unicast<L> {
     pub req_id_res: u8,
     pub seq_num_res: u8,
     pub is_qos: bool,
-
-    intf: Link<L>,
-    cache: ZVec,
-    open_cache: ZVec,
 }
 
-impl<L: LinkIntf> Unicast<L> {
-    pub fn new(intf: Link<L>) -> Self {
-        Unicast {
+impl Default for UnicastParams {
+    fn default() -> Self {
+        Self {
             zid: Default::default(),
             batch_size: 0,
             initial_sn_rx: 0,
@@ -41,15 +43,26 @@ impl<L: LinkIntf> Unicast<L> {
             req_id_res: 0,
             seq_num_res: 0,
             is_qos: false,
+        }
+    }
+}
 
+impl<L: LinkIntf> Unicast<L> {
+    pub fn new(intf: Link<L>) -> Self {
+        Unicast {
             intf,
             cache: ZVec::new(),
             open_cache: ZVec::new(),
         }
     }
 
-    pub fn handshake(&mut self, whatami: WhatAmI, zid: ZenohID) -> Result<(), TransportError> {
+    pub fn handshake(
+        &mut self,
+        whatami: WhatAmI,
+        zid: ZenohID,
+    ) -> Result<UnicastParams, TransportError> {
         let ism = InitSyn::new(whatami, zid);
+        let mut params: UnicastParams = Default::default();
 
         let (seq_num_res, req_id_res, batch_size) = if let TransportMessage {
             body: TransportBody::InitSyn(ism),
@@ -59,9 +72,9 @@ impl<L: LinkIntf> Unicast<L> {
         } else {
             return Err(TransportError::UnexpectMsg);
         };
-        self.seq_num_res = seq_num_res;
-        self.req_id_res = req_id_res;
-        self.batch_size = batch_size;
+        params.seq_num_res = seq_num_res;
+        params.req_id_res = req_id_res;
+        params.batch_size = batch_size;
 
         #[cfg(feature = "defmt")]
         defmt::debug!("Sending Z_INIT(Syn)");
@@ -88,35 +101,35 @@ impl<L: LinkIntf> Unicast<L> {
         // Any of the size parameters in the InitAck must be less or equal than the one in the InitSyn,
         // otherwise the InitAck message is considered invalid and it should be treated as a
         // CLOSE message with L==0 by the Initiating Peer -- the recipient of the InitAck message.
-        self.seq_num_res = if self.seq_num_res >= iam.seq_num_res {
+        params.seq_num_res = if params.seq_num_res >= iam.seq_num_res {
             iam.seq_num_res
         } else {
             return Err(TransportError::OpenSnResolution);
         };
 
-        self.req_id_res = if self.req_id_res >= iam.req_id_res {
+        params.req_id_res = if params.req_id_res >= iam.req_id_res {
             iam.req_id_res
         } else {
             return Err(TransportError::OpenSnResolution);
         };
 
-        self.batch_size = if self.batch_size >= iam.batch_size {
+        params.batch_size = if params.batch_size >= iam.batch_size {
             iam.batch_size
         } else {
             return Err(TransportError::OpenSnResolution);
         };
 
-        self.key_id_res = 0x08 << self.key_id_res;
-        self.req_id_res = 0x08 << self.req_id_res;
+        params.key_id_res = 0x08 << params.key_id_res;
+        params.req_id_res = 0x08 << params.req_id_res;
 
-        self.initial_sn_tx = SmallRng::seed_from_u64(0).random();
-        self.initial_sn_tx = self.initial_sn_tx & !_z_sn_modulo_mask(self.seq_num_res);
+        params.initial_sn_tx = SmallRng::seed_from_u64(0).random();
+        params.initial_sn_tx = params.initial_sn_tx & !_z_sn_modulo_mask(params.seq_num_res);
 
-        self.zid = iam.zid;
+        params.zid = iam.zid;
 
         OpenSyn::new(
             Z_TRANSPORT_LEASE,
-            self.initial_sn_tx,
+            params.initial_sn_tx,
             Some(&iam.cookie.unwrap()),
         )
         .encode(&mut self.open_cache)?;
@@ -138,15 +151,19 @@ impl<L: LinkIntf> Unicast<L> {
             defmt::debug!("Received Z_OPEN(Ack)");
             oam
         } else {
-            return Err(TransportError::UnexpectMsg);   
+            return Err(TransportError::UnexpectMsg);
         };
 
         #[cfg(feature = "defmt")]
         defmt::debug!("sn {}", oam.initial_sn);
 
-        self.lease = oam.lease;
-        self.initial_sn_rx = oam.initial_sn;
-        
+        params.lease = oam.lease;
+        params.initial_sn_rx = oam.initial_sn;
+
+        Ok(params)
+    }
+
+    pub fn update(&mut self, _params: &UnicastParams) -> Result<(), TransportError> {
         Ok(())
     }
 }

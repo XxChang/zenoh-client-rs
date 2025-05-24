@@ -16,20 +16,8 @@ use zenoh_client_rs::{
     link::serial::SerialIntf,
     protocol::{whatami::WhatAmI, ZenohID},
 };
-// use rand::{rngs::SmallRng, SeedableRng};
 
-// struct WrapperRng(SmallRng);
-
-// impl WrapperRng {
-//     pub fn new(seed: u64) -> Self {
-//         WrapperRng(SmallRng::seed_from_u64(seed))
-//     }
-// }
-// impl zenoh_client_rs::transport::RandomGenerator for &WrapperRng {
-//     fn get_random<u32>(self) -> u32 {
-
-//     }
-// }
+const KEYEXPR: &str = "demo/example/zenoh-pico-pub";
 
 struct WrapperRx(pub Rx<USART3>);
 
@@ -75,7 +63,6 @@ fn main() -> ! {
     let mut gpiob = p.GPIOB.split();
 
     let tx = gpiob.pb10.into_alternate_push_pull(&mut gpiob.crh);
-    // let tx = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
     let rx = gpiob.pb11;
 
     let mut afio = p.AFIO.constrain();
@@ -97,16 +84,18 @@ fn main() -> ! {
     let delay = cp.SYST.delay(&clocks);
     let delay = delay.forward();
 
-    defmt::debug!("Creating serial interface");
     let intf = SerialIntf::new(rx, tx, delay);
 
     let id = ZenohID::from(0x49);
     let mode = WhatAmI::default();
     let cfg = zenoh_client_rs::Config::new(id, mode);
 
-    defmt::debug!("Opening client ep {}", intf.name());
+    defmt::debug!("Opening session...");
+    let session = zenoh_client_rs::open(intf, &cfg).unwrap();
+    defmt::debug!("OK");
 
-    zenoh_client_rs::transport::new_client(intf, &cfg).unwrap();
+    defmt::debug!("Declaring publisher for {} ...", KEYEXPR);
 
+    
     loop {}
 }

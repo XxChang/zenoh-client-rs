@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
+use link::{Endpoint, LinkIntf};
 use protocol::{whatami::WhatAmI, ZenohID};
+use thiserror::Error;
+use transport::Transport;
 
 mod iobuf;
 pub mod link;
@@ -15,6 +18,12 @@ const Z_SN_RESOLUTION: u8 = 0x02;
 const Z_REQ_RESOLUTION: u8 = 0x02;
 const Z_TRANSPORT_LEASE: u32 = 10000;
 
+#[derive(Debug, Error)]
+pub enum SessionError {
+    #[error("Transport Error")]
+    TransportError(#[from] crate::transport::TransportError)
+}
+
 pub struct Config {
     pub id: ZenohID,
     pub mode: WhatAmI,
@@ -26,11 +35,16 @@ impl Config {
     }
 }
 
-pub fn open(cfg: &Config) {
-    match cfg.mode {
-        WhatAmI::Client => {}
-        _ => {
-            unimplemented!()
-        }
-    }
+
+pub struct Session {
+
+}
+
+pub fn open<L: LinkIntf, E: Endpoint<L = L>>(ep: E, cfg: &Config) -> Result<Session, SessionError> {
+    let _t = Transport::new(ep, cfg)?;
+    Ok(Session {})
+}
+
+impl Session {
+    
 }
